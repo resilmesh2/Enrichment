@@ -24,3 +24,4 @@ logging.basicConfig(level=LOG_LEVEL)
 log_format = logging.Formatter(
     "[%(asctime)s %(levelname)s] %(message)s", "%d-%m-%Y %H:%M:%S"
 )
+
