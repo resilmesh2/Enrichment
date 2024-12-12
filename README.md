@@ -10,8 +10,8 @@ _see_: https://www.silentpush.com/
 
 ## Dependencies
 This container is part of the Resilmesh Framework and depends on the other following containers:
-- [Vector](../../../Vector/README.md)
-- [NATS](../../../Nats/Dockerfile)
+- [Vector](../Vector/README.md)
+- [NATS](../NATS/README.md)
 
 ## Configuration
 First you need an API key, contact <Maja Otic [motic@silentpush.com](motic@silentpush.com)> if you don't have one yet.
