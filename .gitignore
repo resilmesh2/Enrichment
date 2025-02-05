@@ -12,3 +12,5 @@
 /publisher.log
 /subscriber.log
 /nohup.out
+/.pytest_cache/
+__pycache__
