@@ -4,15 +4,13 @@ on: push
 jobs:
   bandit:
     runs-on: ubuntu-latest
-    permissions:
-      # required for all workflows
-      security-events: write
-      # only required for workflows in private repositories
-      actions: read
-      contents: read
     steps:
-      - name: Perform Bandit Analysis
-        uses: PyCQA/bandit-action@v1
+      - uses: actions/checkout@main
+      - name: Bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit
+          bandit -c bandit.yaml -iii -r .
   test:
     runs-on: ubuntu-latest
     steps:
