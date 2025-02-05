@@ -5,5 +5,4 @@ repos:
   rev: '1.8.2'
   hooks:
     - id: bandit
-      args: ['-r', '.']
-#      additional_dependencies: ['six:1.17.0', ]
+      args: ['-c', 'bandit.yaml', '-iii', '-r', '.']
