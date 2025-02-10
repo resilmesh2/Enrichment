@@ -81,7 +81,7 @@ async def enrich_ipv6s():
                             messages_to_publish = prepare_ips_to_publish(
                                 enriched_ipv6s, messages_to_publish, logger
                             )
-                            set_cached_events(enriched_ipv6s)
+                            set_cached_events(enriched_ipv6s, logger)
                             await bulk_publish_messages(messages_to_publish, logger)
                     if os.path.exists(path + file.name):
                         os.remove(path + file.name)

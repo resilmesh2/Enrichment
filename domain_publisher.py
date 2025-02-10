@@ -81,7 +81,7 @@ async def enrich_domains():
                             messages_to_publish = prepare_domains_to_publish(
                                 enriched_domains, messages_to_publish, logger
                             )
-                            set_cached_events(enriched_domains)
+                            set_cached_events(enriched_domains, logger)
                             await bulk_publish_messages(messages_to_publish, logger)
                     if os.path.exists(path + file.name):
                         os.remove(path + file.name)

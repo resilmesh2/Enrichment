@@ -120,12 +120,15 @@ def get_cached_events(events: list or set, logger) -> tuple:
     return cached_events, uncached_events
 
 
-def set_cached_events(events):
+def set_cached_events(events, logger):
     for event in events:
-        cache_key = event.get("ip").__str__().strip("{}").replace("'", "")
-        if redis.get(cache_key):
-            continue
-        redis.set(cache_key, json.dumps(event), ex=86400)  # 1 day
+        try:
+            cache_key = event.get("ip").__str__().strip("{}").replace("'", "")
+            if redis.get(cache_key):
+                continue
+            redis.set(cache_key, json.dumps(event), ex=86400)  # 1 day
+        except AttributeError as e:
+            logger.warning(f"caching failed: {e}")
 
 
 # @TODO: generator maybe?
