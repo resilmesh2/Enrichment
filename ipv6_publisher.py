@@ -1,4 +1,5 @@
 import asyncio
+import http
 import logging
 import os
 from logging.handlers import RotatingFileHandler
@@ -37,7 +38,9 @@ def bulk_enrich_ipv6s(ipv6s: set) -> list:
     _URI = API_URL + "explore/bulk/summary/ipv6?explain=1"
     logger.info(f"Enriching {len(ipv6s)} IPv6s")
     ipv6s = list(set(ipv6s))
-    enriched_data = do_request({"ips": ipv6s}, _URI, logger)
+    enriched_data, status_code = do_request({"ips": ipv6s}, _URI, logger)
+    if status_code == http.HTTPStatus.SERVICE_UNAVAILABLE:
+        subscriberState.close_connection()
     if not enriched_data:
         logger.info(f"No enriched data: {enriched_data}")
     try:
@@ -71,6 +74,7 @@ async def enrich_ipv6s():
                                 if not line:
                                     continue
                                 ipv6s.append((line.get("source", {}) or {}).get("ip"))
+                                ipv6s.append((line.get("destination", {}) or {}).get("ip"))
                                 messages_to_publish.append(line)
                             if not ipv6s:
                                 continue

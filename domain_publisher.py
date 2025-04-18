@@ -35,19 +35,21 @@ def bulk_enrich_domains(domains: set) -> list:
     _URI = API_URL + "explore/bulk/summary/domain?explain=1"
     logger.info(f"Enriching {len(domains)} domains")
     domains = list(set(domains))
-    enriched_data = do_request({"domains": domains}, _URI, logger)
+    enriched_data, status_code = do_request({"domains": domains}, _URI, logger)
+    if status_code == http.HTTPStatus.SERVICE_UNAVAILABLE:
+        subscriberState.close_connection()
     if not enriched_data:
         logger.info(f"No enriched data: {enriched_data}")
     try:
         enriched_data = list(
             map(  # calculates Wazuh rule level based on SLP risk score
                 lambda i:
-                dict(i, wazuh_rule_level=floor((i.get('sp_risk_score') or 0) / 6.5)),
+                dict(i, wazuh_rule_level=floor((i.get('sp_risk_score') or 0) / 6.5)) if isinstance(i, dict) else None,
                 enriched_data
             )
         )
-    except AttributeError:
-        logger.warning("skipping, attribute error")
+    except AttributeError as e:
+        logger.warning(f"skipping, attribute error {e}")
     return enriched_data
 
 
@@ -70,6 +72,9 @@ async def enrich_domains():
                                     continue
                                 domains.append(
                                     (line.get("source", {}) or {}).get("domain")
+                                )
+                                domains.append(
+                                    (line.get("destination", {}) or {}).get("domain")
                                 )
                                 messages_to_publish.append(line)
                             if not domains:

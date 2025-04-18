@@ -72,6 +72,7 @@ async def enrich_ipv4s():
                                 if not line:
                                     continue
                                 ipv4s.append((line.get("source", {}) or {}).get("ip"))
+                                ipv4s.append((line.get("destination", {}) or {}).get("ip"))
                                 messages_to_publish.append(line)
                             if not ipv4s:
                                 continue
