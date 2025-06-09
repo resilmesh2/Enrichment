@@ -1,0 +1,21 @@
+services:
+  resilmesh_ap_silentpush:
+    hostname: "silentpush-enrichment"
+    restart: unless-stopped
+    env_file:
+      - "./.env"
+    build:
+      context: "./"
+    healthcheck:
+      test: "(ps aux | grep -i subscriber.py | grep -v grep)
+#      && (tail -n2 subscriber.log | grep \"$(date '+%d-%m-%Y %H:%M')\")"
+      interval: 1s
+      retries: 60
+    deploy:
+      # docker compose -f production.yml up -d --scale resilmesh_ap_silentpush=3 --no-recreate
+      replicas: 2
+    networks:
+      - resilmesh_network
+    depends_on: ["resilmesh_ap_nats"]
+    volumes:
+      - ./sp-enrichment:/home/app/sp-enrichment

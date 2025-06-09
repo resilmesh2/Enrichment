@@ -7,13 +7,15 @@ LABEL authors="jorgeley@silentpush.com"
 RUN apt -y update
 #RUN apt -y install procps iputils* net-tools
 RUN adduser app --system --home /home/app
-COPY . /home/app/
+COPY --chmod=755 ./sp-enrichment/ /home/app/sp-enrichment
+COPY --chmod=755 entrypoint.sh /home/app/
 RUN chown -R app:nogroup /home/app
+RUN chmod 755 -R /home/app
 
 USER app
 WORKDIR /home/app
 RUN pip install --upgrade pip
-RUN pip3 install -r /home/app/requirements.txt
+RUN pip3 install -r sp-enrichment/requirements.txt
 RUN mkdir -p \
     events/inbound/ipv4s \
     events/inbound/ipv6s \
@@ -25,5 +27,6 @@ RUN mkdir -p \
     events/outbound/domains \
     events/outbound/unknown
 RUN touch publisher.log
-RUN chmod a+x entrypoint.sh
-ENTRYPOINT ./entrypoint.sh
+RUN chmod 755 entrypoint.sh
+# RUN pwd ; ls -la . ; ls -laR sp-enrichment
+ENTRYPOINT /home/app/entrypoint.sh
