@@ -17,3 +17,4 @@ services:
     depends_on: ["resilmesh_ap_nats"]
     volumes:
       - ./sp-enrichment:/home/app/sp-enrichment
+
