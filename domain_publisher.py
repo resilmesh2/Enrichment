@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import http
 import logging
@@ -6,12 +7,16 @@ from logging.handlers import RotatingFileHandler
 from math import floor
 
 from filelock import FileLock, Timeout
-from settings import API_URL, EVENTS_DIR, NATS_URL, PUBLISHER_LOG_FILE, log_format
-from utils.api import bulk_publish_messages, do_request, prepare_domains_to_publish, get_cached_events, \
+from settings import API_URL, PUBLISHER_LOG_FILE, log_format
+from utils.api import (
+    bulk_publish_messages,
+    do_request,
+    prepare_domains_to_publish,
+    get_cached_events,
     set_cached_events
+)
 from utils.custom_ndjson_reader import CustomNDJSONReader
 from utils.subscriberState import SubscriberState
-from utils.utils import skip_current_file
 
 """
 Enriches Domain events from NATS using Silent Push API
@@ -26,6 +31,10 @@ log_file_handler.setFormatter(log_format)
 if logger.hasHandlers():
     logger.handlers.clear()
 logger.addHandler(log_file_handler)
+parser = argparse.ArgumentParser()
+parser.add_argument("event")
+parser.add_argument("event_type")
+args = parser.parse_args()
 
 
 def bulk_enrich_domains(domains: set) -> list:
@@ -53,55 +62,55 @@ def bulk_enrich_domains(domains: set) -> list:
     return enriched_data
 
 
-async def enrich_domains():
-    while True:
-        path = f"{EVENTS_DIR}outbound/domains/"
-        with os.scandir(path) as files:
-            for file in files:
-                lock = FileLock(path + file.name + ".lock", thread_local=False)
-                if skip_current_file(file, lock):
-                    continue
-                domains = list()
-                messages_to_publish = list()
-                try:
-                    with lock.acquire(timeout=5):
-                        with open(path + file.name) as f:
-                            reader = CustomNDJSONReader(f)
-                            for line in reader:
-                                if not line:
-                                    continue
-                                domains.append(
-                                    (line.get("source", {}) or {}).get("domain")
-                                )
-                                domains.append(
-                                    (line.get("destination", {}) or {}).get("domain")
-                                )
-                                messages_to_publish.append(line)
-                            if not domains:
-                                continue
-                            enriched_cache, new_domains = get_cached_events(set(domains), logger)
-                            enriched_domains = bulk_enrich_domains(set(new_domains))
-                            if enriched_cache:
-                                enriched_domains.extend(enriched_cache)
-                            messages_to_publish = prepare_domains_to_publish(
-                                enriched_domains, messages_to_publish, logger
-                            )
-                            set_cached_events(enriched_domains, logger)
-                            await bulk_publish_messages(messages_to_publish, logger)
-                    if os.path.exists(path + file.name):
-                        os.remove(path + file.name)
-                except Timeout:
-                    logger.info(
-                        f"Can't acquire lock on {lock.lock_file}"
-                        f", locked? {lock.is_locked}, skipping..."
+async def enrich_domains(event):
+    logger.info(f"file {event}")
+    lock = FileLock(f"{event}.lock", thread_local=False)
+    domains = list()
+    messages_to_publish = list()
+    try:
+        with lock.acquire(timeout=5):
+            with open(event) as f:
+                reader = CustomNDJSONReader(f)
+                for line in reader:
+                    if not line:
+                        continue
+                    domains.append(
+                        (line.get("source", {}) or {}).get("domain")
                     )
-                finally:
-                    lock.release()
-                lock.release()
+                    domains.append(
+                        (line.get("destination", {}) or {}).get("domain")
+                    )
+                    messages_to_publish.append(line)
+                if not domains:
+                    return
+                enriched_cache, new_domains = get_cached_events(set(domains), logger)
+                enriched_domains = bulk_enrich_domains(set(new_domains))
+                if enriched_cache:
+                    enriched_domains.extend(enriched_cache)
+                messages_to_publish = prepare_domains_to_publish(
+                    enriched_domains, messages_to_publish, logger
+                )
+                set_cached_events(enriched_domains, logger)
+                await bulk_publish_messages(messages_to_publish, logger)
+        if os.path.exists(event):
+            os.remove(event)
+    except FileNotFoundError:
+        pass
+    except Timeout:
+        logger.info(
+            f"Can't acquire lock on {lock.lock_file}"
+            f", locked? {lock.is_locked}, skipping..."
+        )
+    finally:
+        lock.release()
+    lock.release()
 
 
 async def main():
-    enrich_domains_task = loop.create_task(enrich_domains())
+    if args.event_type == "deleted":
+        return ((None, None),)
+    logger.info(f"{args.event_type}: {args.event}")
+    enrich_domains_task = loop.create_task(enrich_domains(args.event))
     await asyncio.wait([enrich_domains_task])
     return (("enrich_domains_task", enrich_domains_task),)
 
