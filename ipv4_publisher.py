@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import http
 import logging
@@ -6,11 +7,16 @@ from logging.handlers import RotatingFileHandler
 from math import floor
 
 from filelock import FileLock, Timeout
-from settings import API_URL, EVENTS_DIR, PUBLISHER_LOG_FILE, log_format
-from utils.api import bulk_publish_messages, do_request, prepare_ips_to_publish, get_cached_events, set_cached_events
+from settings import API_URL, PUBLISHER_LOG_FILE, log_format
+from utils.api import (
+    bulk_publish_messages,
+    do_request,
+    prepare_ips_to_publish,
+    get_cached_events,
+    set_cached_events
+)
 from utils.custom_ndjson_reader import CustomNDJSONReader
 from utils.subscriberState import SubscriberState
-from utils.utils import skip_current_file
 
 """
 Enriches IPV4 events from NATS using Silent Push API
@@ -25,6 +31,10 @@ log_file_handler.setFormatter(log_format)
 if logger.hasHandlers():
     logger.handlers.clear()
 logger.addHandler(log_file_handler)
+parser = argparse.ArgumentParser()
+parser.add_argument("event")
+parser.add_argument("event_type")
+args = parser.parse_args()
 
 
 def bulk_enrich_ipv4s(ipv4s: set) -> list:
@@ -52,53 +62,51 @@ def bulk_enrich_ipv4s(ipv4s: set) -> list:
     return enriched_data
 
 
-async def enrich_ipv4s():
-    while True:
-        path = f"{EVENTS_DIR}outbound/ipv4s/"
-        with os.scandir(path) as files:
-            # logger.info(f"files {files}")
-            for file in files:
-                # logger.info(f"file {file.name}")
-                lock = FileLock(path + file.name + ".lock", thread_local=False)
-                if skip_current_file(file, lock):
-                    continue
-                ipv4s = list()
-                messages_to_publish = list()
-                try:
-                    with lock.acquire(timeout=5):
-                        with open(path + file.name) as f:
-                            reader = CustomNDJSONReader(f)
-                            for line in reader:
-                                if not line:
-                                    continue
-                                ipv4s.append((line.get("source", {}) or {}).get("ip"))
-                                ipv4s.append((line.get("destination", {}) or {}).get("ip"))
-                                messages_to_publish.append(line)
-                            if not ipv4s:
-                                continue
-                            enriched_cache, new_ipv4s = get_cached_events(set(ipv4s), logger)
-                            enriched_ipv4s = bulk_enrich_ipv4s(set(new_ipv4s))
-                            if enriched_cache:
-                                enriched_ipv4s.extend(enriched_cache)
-                            messages_to_publish = prepare_ips_to_publish(
-                                enriched_ipv4s, messages_to_publish, logger
-                            )
-                            set_cached_events(enriched_ipv4s, logger)
-                            await bulk_publish_messages(messages_to_publish, logger)
-                    if os.path.exists(path + file.name):
-                        os.remove(path + file.name)
-                except Timeout:
-                    logger.info(
-                        f"Can't acquire lock on {lock.lock_file}"
-                        f", locked? {lock.is_locked}, skipping..."
-                    )
-                finally:
-                    lock.release()
-                lock.release()
+async def enrich_ipv4s(event):
+    logger.info(f"file {event}")
+    lock = FileLock(f"{event}.lock", thread_local=False)
+    ipv4s = list()
+    messages_to_publish = list()
+    try:
+        with lock.acquire(timeout=5):
+            with open(event) as f:
+                reader = CustomNDJSONReader(f)
+                for line in reader:
+                    if not line:
+                        continue
+                    ipv4s.append((line.get("source", {}) or {}).get("ip"))
+                    ipv4s.append((line.get("destination", {}) or {}).get("ip"))
+                    messages_to_publish.append(line)
+                if not ipv4s:
+                    return
+                enriched_cache, new_ipv4s = get_cached_events(set(ipv4s), logger)
+                enriched_ipv4s = bulk_enrich_ipv4s(set(new_ipv4s))
+                if enriched_cache:
+                    enriched_ipv4s.extend(enriched_cache)
+                messages_to_publish = prepare_ips_to_publish(
+                    enriched_ipv4s, messages_to_publish, logger
+                )
+                set_cached_events(enriched_ipv4s, logger)
+                await bulk_publish_messages(messages_to_publish, logger)
+        if os.path.exists(event):
+            os.remove(event)
+    except FileNotFoundError:
+        pass
+    except Timeout:
+        logger.info(
+            f"Can't acquire lock on {lock.lock_file}"
+            f", locked? {lock.is_locked}, skipping..."
+        )
+    finally:
+        lock.release()
+    lock.release()
 
 
 async def main():
-    enrich_ipv4s_task = loop.create_task(enrich_ipv4s())
+    if args.event_type == "deleted":
+        return ((None, None),)
+    logger.info(f"{args.event_type}: {args.event}")
+    enrich_ipv4s_task = loop.create_task(enrich_ipv4s(args.event))
     await asyncio.wait([enrich_ipv4s_task])
     return (("enrich_ipv4s_task", enrich_ipv4s_task),)
 
