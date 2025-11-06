@@ -3,7 +3,7 @@ services:
     hostname: "silentpush-enrichment"
     restart: unless-stopped
     env_file:
-      - "../../resilmesh.conf"
+      - ".env"
     build:
       context: "./"
     healthcheck:
@@ -15,6 +15,4 @@ services:
     networks:
       - resilmesh_network
     depends_on: ["resilmesh_ap_nats"]
-    volumes:
-      - ./sp-enrichment:/home/app/sp-enrichment
 
