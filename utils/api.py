@@ -110,13 +110,16 @@ def get_cached_events(events: list or set, logger) -> tuple:
     uncached_events = list()
     for event in events:
         cache_key = event.__str__().strip("{}").replace("'", "")
-        event_cache = redis.get(cache_key)
-        if event_cache:
-            logger.debug(f"cache hit '{event}'")
-            cached_events.append(json.loads(event_cache))
-        else:
-            logger.debug(f"cache miss '{event}'")
-            uncached_events.append(event)
+        try:
+            event_cache = redis.get(cache_key)
+            if event_cache:
+                logger.debug(f"cache hit '{event}'")
+                cached_events.append(json.loads(event_cache))
+            else:
+                logger.debug(f"cache miss '{event}'")
+                uncached_events.append(event)
+        except redis.exceptions.ConnectionError as e:
+            logger.warning(f"caching failed: {e}")
     return cached_events, uncached_events
 
 
@@ -127,7 +130,7 @@ def set_cached_events(events, logger):
             if redis.get(cache_key):
                 continue
             redis.set(cache_key, json.dumps(event), ex=86400)  # 1 day
-        except AttributeError as e:
+        except (AttributeError, redis.exceptions.ConnectionError) as e:
             logger.warning(f"caching failed: {e}")
 
 

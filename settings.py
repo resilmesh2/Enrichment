@@ -18,7 +18,13 @@ LOG_LEVEL = int(os.environ.get("LOG_LEVEL", logging.INFO))
 EVENTS_DIR = os.environ.get("EVENTS_DIR", "./events/")
 REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
 REDIS_PORT = os.environ.get("REDIS_PORT", 6379)
-redis = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+REDIS_DB = os.environ.get("REDIS_DB", 1)
+redis = redis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    db=REDIS_DB,
+    decode_responses=True
+)
 
 logging.basicConfig(level=LOG_LEVEL)
 log_format = logging.Formatter(
