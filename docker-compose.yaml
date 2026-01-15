@@ -1,5 +1,5 @@
 services:
-  resilmesh_ap_silentpush:
+  resilmesh-ap-silentpush:
     hostname: "silentpush-enrichment"
     restart: unless-stopped
     env_file:
@@ -14,5 +14,5 @@ services:
       replicas: 2
     networks:
       - resilmesh_network
-    depends_on: ["resilmesh_ap_nats"]
+    depends_on: ["resilmesh-ap-nats"]
 
