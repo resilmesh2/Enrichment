@@ -20,7 +20,7 @@ With the API key copied in the previous step, create an .env file with the follo
 ```dotenv
 API_URL="https://app.silentpush.com/api/v1/merge-api/"
 API_KEY="<YOUR SILENT PUSH API KEY>"
-NATS_URL="nats://nats:4222"
+NATS_URL="nats://resilmesh-ap-nats:4222"
 SUBSCRIBE_SUBJECT="ecs_events"
 SUBSCRIBE_QUEUE="enrichment_queue"
 PUBLISH_SUBJECT="enriched_events"
